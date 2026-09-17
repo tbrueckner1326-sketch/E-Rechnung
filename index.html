@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRechnung-Generator</title>
+<style>
+  :root{
+    --ink:#101a2b;
+    --paper:#f6f4ee;
+    --line:#c9c2af;
+    --accent:#2b5a8c;
+    --accent-dark:#173a5e;
+    --ok:#2f6d4f;
+    --err:#a4392b;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --serif: "Source Serif 4", "Georgia", serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#161c26; --ink:#e9e6dc; --line:#3a4453; }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--serif);
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(43,90,140,0.06) 28px),
+      repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(43,90,140,0.06) 28px),
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    padding:2.4rem 1.4rem 1.2rem;
+    border-bottom:2px solid var(--ink);
+    max-width:920px;
+    margin:0 auto;
+  }
+  header .kicker{
+    font-family:var(--mono);
+    font-size:0.75rem;
+    letter-spacing:0.04em;
+    color:var(--accent);
+    margin:0 0 0.4rem;
+  }
+  header h1{
+    font-size:1.9rem;
+    margin:0 0 0.3rem;
+    font-weight:600;
+  }
+  header p{
+    margin:0;
+    max-width:60ch;
+    line-height:1.5;
+    color:color-mix(in srgb, var(--ink) 75%, transparent);
+  }
+  main{
+    max-width:920px;
+    margin:0 auto;
+    padding:1.6rem 1.4rem 5rem;
+  }
+  section.block{
+    background:color-mix(in srgb, var(--paper) 60%, white 40%);
+    border:1px solid var(--line);
+    padding:1.4rem 1.4rem 1.6rem;
+    margin-bottom:1.4rem;
+  }
+  @media (prefers-color-scheme: dark){
+    section.block{ background:color-mix(in srgb, var(--paper) 70%, black 10%); }
+  }
+  section.block h2{
+    font-size:0.95rem;
+    text-transform:none;
+    margin:0 0 1rem;
+    padding-bottom:0.5rem;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:baseline;
+    gap:0.5rem;
+    font-family:var(--mono);
+    font-weight:600;
+  }
+  section.block h2 .n{ color:var(--accent); }
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0.9rem 1rem;
+  }
+  .grid.g3{ grid-template-columns:1fr 1fr 1fr; }
+  @media(max-width:640px){
+    .grid, .grid.g3{ grid-template-columns:1fr; }
+  }
+  .field{ display:flex; flex-direction:column; gap:0.3rem; }
+  .field.span2{ grid-column:span 2; }
+  @media(max-width:640px){ .field.span2{ grid-column:span 1; } }
+  label{
+    font-size:0.72rem;
+    font-family:var(--mono);
+    color:color-mix(in srgb, var(--ink) 70%, transparent);
+  }
+  label .req{ color:var(--err); }
+  input, select, textarea{
+    font-family:var(--serif);
+    font-size:0.95rem;
+    padding:0.5rem 0.55rem;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  textarea{
+    resize:vertical;
+    min-height:2.4em;
+    line-height:1.4;
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .hint{
+    font-size:0.78rem;
+    color:color-mix(in srgb, var(--ink) 60%, transparent);
+    margin-top:0.3rem;
+    line-height:1.4;
+  }
+  table.lines{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:0.3rem;
+  }
+  table.lines th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:0.68rem;
+    font-weight:600;
+    padding:0.3rem 0.4rem;
+    border-bottom:1px solid var(--ink);
+  }
+  table.lines td{
+    padding:0.35rem 0.4rem;
+    vertical-align:top;
+    border-bottom:1px solid var(--line);
+  }
+  table.lines input, table.lines select{ width:100%; padding:0.4rem; }
+  .col-desc{ width:40%; }
+  .col-num{ width:9.5%; }
+  .col-rm{ width:2rem; text-align:center; }
+  table.lines textarea{
+    width:100%;
+    resize:vertical;
+    min-height:2.2em;
+    font-size:0.9rem;
+  }
+  button{
+    font-family:var(--mono);
+    font-size:0.8rem;
+    cursor:pointer;
+    border:1px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    padding:0.5rem 0.9rem;
+  }
+  button:hover{ background:var(--ink); color:var(--paper); }
+  button.rm{
+    border-color:var(--err);
+    color:var(--err);
+    padding:0.25rem 0.5rem;
+    font-size:0.85rem;
+  }
+  button.rm:hover{ background:var(--err); color:white; }
+  .add-row{ margin-top:0.7rem; }
+  .totals{
+    margin-top:1rem;
+    display:flex;
+    justify-content:flex-end;
+  }
+  .totals table{ border-collapse:collapse; font-family:var(--mono); font-size:0.85rem; }
+  .totals td{ padding:0.25rem 0.6rem; text-align:right; }
+  .totals tr.grand td{ border-top:1px solid var(--ink); font-weight:600; font-size:0.95rem; padding-top:0.5rem; }
+  .actions{
+    display:flex;
+    gap:0.8rem;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:0.4rem;
+  }
+  .actions button.primary{
+    background:var(--accent-dark);
+    color:white;
+    border-color:var(--accent-dark);
+    padding:0.65rem 1.2rem;
+    font-size:0.85rem;
+  }
+  .actions button.primary:hover{ background:var(--accent); border-color:var(--accent); }
+  #status{
+    font-family:var(--mono);
+    font-size:0.8rem;
+    margin-top:0.6rem;
+    min-height:1.2em;
+  }
+  #status.error{ color:var(--err); }
+  #status.ok{ color:var(--ok); }
+  #importStatus, #viewerStatus{
+    font-family:var(--mono);
+    font-size:0.8rem;
+    margin-top:0.6rem;
+    min-height:1.2em;
+  }
+  #importStatus.error, #viewerStatus.error{ color:var(--err); }
+  #importStatus.ok, #viewerStatus.ok{ color:var(--ok); }
+  .viewer-block{
+    margin-top:1rem;
+    padding:1rem;
+    border:1px solid var(--line);
+    background:color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+  .viewer-block h3{ margin:0 0 0.6rem; font-family:var(--mono); font-size:0.95rem; }
+  .viewer-badge{
+    font-size:0.65rem;
+    font-family:var(--mono);
+    background:var(--accent);
+    color:white;
+    padding:0.1rem 0.4rem;
+    margin-left:0.5rem;
+    vertical-align:middle;
+  }
+  .viewer-parties{
+    display:flex;
+    gap:2rem;
+    flex-wrap:wrap;
+    margin:0.6rem 0;
+    font-size:0.85rem;
+    line-height:1.5;
+  }
+  .viewer-table, .viewer-totals{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:0.6rem;
+    font-size:0.85rem;
+  }
+  .viewer-table th, .viewer-table td, .viewer-totals td{
+    padding:0.35rem 0.5rem;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+  }
+  .viewer-totals td:last-child{ text-align:right; font-family:var(--mono); }
+  .viewer-note{
+    margin-top:0.6rem;
+    font-size:0.8rem;
+    padding:0.5rem 0.6rem;
+    background:color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  details{ margin-top:1rem; }
+  details summary{
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:0.78rem;
+    color:var(--accent);
+  }
+  pre#xmlPreview{
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-family:var(--mono);
+    font-size:0.72rem;
+    line-height:1.4;
+    background:color-mix(in srgb, var(--ink) 6%, transparent);
+    padding:1rem;
+    border:1px solid var(--line);
+    max-height:420px;
+    overflow:auto;
+    margin-top:0.6rem;
+  }
+  footer{
+    max-width:920px;
+    margin:0 auto;
+    padding:0 1.4rem 3rem;
+    font-size:0.78rem;
+    line-height:1.5;
+    color:color-mix(in srgb, var(--ink) 65%, transparent);
+  }
+  footer a{ color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="kicker">EN 16931 · UBL 2.1 · XRECHNUNG 3.0.2</p>
+  <h1>XRechnung-Generator</h1>
+  <p>Erfasst eine Rechnung mit allen Pflichtangaben der Norm EN 16931 und erzeugt eine gültige XRechnung-XML-Datei (UBL-Syntax) zum Versand an öffentliche Auftraggeber oder Geschäftskunden.</p>
+</header>
+
+<main>
+
+  <section class="block">
+    <h2><span class="n">01</span> Rechnungssteller (Verkäufer)</h2>
+    <div class="grid">
+      <div class="field span2">
+        <label>Firmenname <span class="req">*</span></label>
+        <input id="s_name" value="b²v² Ingenieurbüro">
+      </div>
+      <div class="field span2">
+        <label>Straße und Hausnummer <span class="req">*</span></label>
+        <input id="s_street" value="Würzstraße 1">
+      </div>
+      <div class="field">
+        <label>PLZ <span class="req">*</span></label>
+        <input id="s_zip" value="81371">
+      </div>
+      <div class="field">
+        <label>Ort <span class="req">*</span></label>
+        <input id="s_city" value="München">
+      </div>
+      <div class="field">
+        <label>Land</label>
+        <input id="s_country" value="DE">
+      </div>
+      <div class="field">
+        <label>USt-IdNr. <span class="req">*</span></label>
+        <input id="s_vat" value="DE221011570">
+      </div>
+      <div class="field">
+        <label>E-Mail (elektronische Adresse) <span class="req">*</span></label>
+        <input id="s_email" value="rechnung@b2v2.de">
+      </div>
+      <div class="field">
+        <label>IBAN <span class="req">*</span></label>
+        <input id="s_iban" value="DE63505300000000410705">
+      </div>
+      <div class="field">
+        <label>BIC</label>
+        <input id="s_bic" value="GENODE51CRO">
+      </div>
+    </div>
+    <div class="hint">Alle Verkäuferdaten sind fest hinterlegt.</div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">02</span> Rechnungsempfänger (Käufer)</h2>
+    <div class="grid">
+      <div class="field span2">
+        <label>Firmenname / Behörde <span class="req">*</span></label>
+        <input id="b_name">
+      </div>
+      <div class="field span2">
+        <label>Straße und Hausnummer <span class="req">*</span></label>
+        <input id="b_street">
+      </div>
+      <div class="field">
+        <label>PLZ <span class="req">*</span></label>
+        <input id="b_zip">
+      </div>
+      <div class="field">
+        <label>Ort <span class="req">*</span></label>
+        <input id="b_city">
+      </div>
+      <div class="field">
+        <label>Land</label>
+        <input id="b_country" value="DE">
+      </div>
+      <div class="field">
+        <label>E-Mail (elektronische Adresse) <span class="req">*</span></label>
+        <input id="b_email">
+      </div>
+      <div class="field">
+        <label>USt-IdNr. Käufer <span id="b_vat_req" class="req" style="display:none;">*</span></label>
+        <input id="b_vat" placeholder="DE987654321">
+        <div class="hint">Nur bei Reverse-Charge (§13b) zwingend erforderlich; sonst optional.</div>
+      </div>
+      <div class="field span2">
+        <label>Leitweg-ID / Referenznummer des Käufers <span class="req">*</span></label>
+        <input id="b_ref" placeholder="991-12345-67 (Behörde) oder interne Bestell-/Auftragsnummer">
+        <div class="hint">Für Rechnungen an öffentliche Auftraggeber (B2G) ist die Leitweg-ID Pflicht. Bei Geschäftskunden genügt eine vereinbarte Referenz (Bestellnummer, Kundennummer o.ä.).</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">03</span> Rechnungsdaten</h2>
+    <div class="grid g3">
+      <div class="field">
+        <label>Rechnungsnummer <span class="req">*</span></label>
+        <input id="inv_id" placeholder="2026-0143">
+      </div>
+      <div class="field">
+        <label>Rechnungsdatum <span class="req">*</span></label>
+        <input id="inv_date" type="date">
+      </div>
+      <div class="field">
+        <label>Fälligkeitsdatum</label>
+        <input id="inv_due" type="date">
+      </div>
+      <div class="field span2">
+        <label>Leistungszeitraum / Leistungsdatum</label>
+        <input id="inv_period" placeholder="z. B. 01.08.2026 – 31.08.2026">
+      </div>
+      <div class="field">
+        <label>Zahlungsziel (Text)</label>
+        <input id="inv_terms" placeholder="Zahlbar innerhalb 14 Tagen ohne Abzug">
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">04</span> Sonderfälle</h2>
+    <div class="field" style="flex-direction:row; align-items:center; gap:0.6rem;">
+      <input type="checkbox" id="rc_active" style="width:auto;">
+      <label for="rc_active" style="font-size:0.85rem; font-family:var(--serif);">Reverse-Charge nach §13b UStG (Bauleistung an Unternehmer) — gesamte Rechnung ohne USt-Ausweis</label>
+    </div>
+    <div id="rc_noteWrap" class="field" style="margin-top:0.6rem; display:none;">
+      <label>Hinweistext auf der Rechnung <span class="req">*</span></label>
+      <textarea id="rc_note" rows="2">Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG. Es wird keine Umsatzsteuer ausgewiesen.</textarea>
+      <div class="hint">Pflichtangabe bei Bauleistungen zwischen Unternehmern nach §13b UStG. Alle Positionen werden automatisch mit 0 % USt (Kategorie „Steuerschuldnerschaft des Leistungsempfängers") ausgestellt.</div>
+    </div>
+
+    <div class="grid" style="margin-top:1rem;">
+      <div class="field">
+        <label>Skonto-Satz (%)</label>
+        <input id="sk_percent" type="number" step="0.1" min="0" placeholder="z. B. 2">
+      </div>
+      <div class="field">
+        <label>Skonto-Frist (Tage ab Rechnungsdatum)</label>
+        <input id="sk_days" type="number" step="1" min="0" placeholder="z. B. 8">
+      </div>
+    </div>
+    <div class="hint" id="sk_hint"></div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">05</span> Rechnungspositionen</h2>
+    <table class="lines" id="linesTable">
+      <thead>
+        <tr>
+          <th class="col-desc">Beschreibung</th>
+          <th class="col-num">Menge</th>
+          <th class="col-num">Einheit</th>
+          <th class="col-num">Einzelpreis €</th>
+          <th class="col-num">USt-Satz</th>
+          <th class="col-num">Netto €</th>
+          <th class="col-rm"></th>
+        </tr>
+      </thead>
+      <tbody id="linesBody"></tbody>
+    </table>
+    <button class="add-row" id="btnAddLine">+ Position hinzufügen</button>
+
+    <div class="totals">
+      <table>
+        <tr><td>Nettosumme</td><td id="t_net">0,00 €</td></tr>
+        <tr id="taxRows"></tr>
+        <tr class="grand"><td>Gesamtbetrag</td><td id="t_gross">0,00 €</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">06</span> XML erzeugen</h2>
+    <div class="actions">
+      <button class="primary" id="btnGenerate">XRechnung erzeugen &amp; als ZIP herunterladen</button>
+      <button id="btnPreview">Nur Vorschau anzeigen</button>
+      <button id="btnCopy">XML in Zwischenablage kopieren</button>
+    </div>
+    <div class="hint">ZIP-Download: enthält die fertige .xml-Datei, einmal entpacken genügt. Alternativ: XML kopieren und in einem Texteditor selbst als „rechnung.xml" speichern (Dateityp „Alle Dateien" wählen, nicht .txt).</div>
+    <div id="status"></div>
+    <details id="previewWrap" style="display:none;">
+      <summary>XML-Vorschau</summary>
+      <pre id="xmlPreview"></pre>
+    </details>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">07</span> XRechnung importieren (zum Weiterbearbeiten)</h2>
+    <div class="hint" style="margin-top:0; margin-bottom:0.6rem;">Lädt eine zuvor mit diesem Tool erstellte XRechnung (UBL-Format) und übernimmt alle Werte in das Formular oben – z. B. für eine Korrektur. Fremde XRechnungen im UBL-Format werden ebenfalls übernommen, soweit die Struktur passt.</div>
+    <input type="file" id="importFile" accept=".xml">
+    <div id="importStatus"></div>
+  </section>
+
+  <section class="block">
+    <h2><span class="n">08</span> Eingehende Rechnung ansehen (Viewer)</h2>
+    <div class="hint" style="margin-top:0; margin-bottom:0.6rem;">Zeigt eine erhaltene E-Rechnung lesbar an – als XML (UBL oder CII) oder als ZUGFeRD-/Factur-X-PDF (die eingebettete XML wird automatisch extrahiert). Rein zum Ansehen, ohne das Formular oben zu verändern.</div>
+    <input type="file" id="viewerFile" accept=".xml,.pdf">
+    <div id="viewerStatus"></div>
+    <div id="viewerOutput"></div>
+  </section>
+
+</main>
+
+<footer>
+  Erzeugt UBL-2.1-XML nach der Spezifikation XRechnung 3.0.2 / EN&nbsp;16931 mit den zentral geforderten Pflichtfeldern (Aussteller, Empfänger, Leitweg-ID/Referenz, USt-Aufschlüsselung, Zahlungsdaten, Positionen). Vor dem produktiven Versand die Datei zusätzlich mit dem offiziellen <a href="https://www.itb.ec.europa.eu/invoice/upload" target="_blank" rel="noopener">KoSIT-Validator</a> prüfen — insbesondere bei Sonderfällen wie Skonto, mehreren USt-Sätzen mit Rundungsdifferenzen oder abweichender Lieferadresse.
+</footer>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
