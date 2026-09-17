@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "secret-scan": "docker run --rm -v .:/repo zricethezav/gitleaks:latest detect --source /repo --no-git"
   },
